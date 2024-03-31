@@ -76,7 +76,7 @@ func (t *RBTree) Insert(key, value string) {
 		}
 	}
 
-	t.checkRoate(inserted)
+	t.checkRotate(inserted)
 }
 
 type Found bool
@@ -96,7 +96,7 @@ func (t *RBTree) Get(key string) (string, Found) {
 	return "", false
 }
 
-func (t *RBTree) checkRoate(node *Node) {
+func (t *RBTree) checkRotate(node *Node) {
 	if node.Parent == nil {
 		node.Color = black
 		return
@@ -111,7 +111,7 @@ func (t *RBTree) checkRoate(node *Node) {
 		node.Parent.Color = black
 		uncle.Color = black
 		node.Parent.Parent.Color = red
-		t.checkRoate(node.Parent.Parent)
+		t.checkRotate(node.Parent.Parent)
 		return
 	}
 
