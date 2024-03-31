@@ -24,7 +24,6 @@ type RBTree struct {
 	Root    *Node
 	Size    int
 	MaxSize int
-	mu      sync.Mutex
 }
 
 type MemTable struct {
@@ -59,9 +58,6 @@ func (t *RBTree) AtMaxSize() bool {
 }
 
 func (t *RBTree) Insert(key, value string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	if t.Root == nil {
 		t.Root = &Node{Key: key, Value: value, Color: black}
 		t.Size += 1
@@ -274,4 +270,31 @@ func (m *MemTable) SwapTree() *RBTree {
 	m.Tree = NewRBTree()
 
 	return currTree
+}
+
+func MemTableFromCache(cache map[string]string) *MemTable {
+	tree := NewRBTree()
+	for key, value := range cache {
+		tree.Insert(key, value)
+	}
+
+	table := MemTable{Tree: tree, mu: sync.Mutex{}}
+
+	return &table
+}
+
+func (m *MemTable) InsertCache(cache map[string]string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for key, value := range cache {
+		m.Tree.Insert(key, value)
+	}
+}
+
+func (m *MemTable) Get(key string) (string, Found) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.Tree.Get(key)
 }
