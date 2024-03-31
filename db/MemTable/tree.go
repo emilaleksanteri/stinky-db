@@ -2,6 +2,7 @@ package memtable
 
 import (
 	"strings"
+	"sync"
 )
 
 type Color bool
@@ -20,8 +21,10 @@ type Node struct {
 }
 
 type RBTree struct {
-	Root *Node
-	Size int
+	Root    *Node
+	Size    int
+	MaxSize int
+	mu      sync.Mutex
 }
 
 func NewRBTree() *RBTree {
@@ -38,7 +41,22 @@ const (
 	KEY_EQUAL_NODE   = 0
 )
 
+func (t *RBTree) GetSize() int {
+	return t.Size
+}
+
+func (t *RBTree) GetMaxSize() int {
+	return t.MaxSize
+}
+
+func (t *RBTree) AtMaxSize() bool {
+	return t.Size == t.MaxSize
+}
+
 func (t *RBTree) Insert(key, value string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	if t.Root == nil {
 		t.Root = &Node{Key: key, Value: value, Color: black}
 		t.Size += 1
@@ -202,6 +220,11 @@ func (t *RBTree) Values() []string {
 	return values
 }
 
+func (t *RBTree) Nodes() []Node {
+	nodes := t.iterateForNodes(t.Root, make([]Node, 0, t.Size))
+	return nodes
+}
+
 func (t *RBTree) iterateForKeys(start *Node, keys []string) []string {
 	if start == nil {
 		return keys
@@ -224,4 +247,16 @@ func (t *RBTree) iterateForVals(start *Node, values []string) []string {
 	values = t.iterateForVals(start.Right, values)
 
 	return values
+}
+
+func (t *RBTree) iterateForNodes(start *Node, nodes []Node) []Node {
+	if start == nil {
+		return nodes
+	}
+
+	nodes = t.iterateForNodes(start.Left, nodes)
+	nodes = append(nodes, *start)
+	nodes = t.iterateForNodes(start.Right, nodes)
+
+	return nodes
 }
