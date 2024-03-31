@@ -191,3 +191,37 @@ func (node *Node) sibling() *Node {
 
 	return node.Parent.Left
 }
+
+func (t *RBTree) Keys() []string {
+	keys := t.iterateForKeys(t.Root, make([]string, 0, t.Size))
+	return keys
+}
+
+func (t *RBTree) Values() []string {
+	values := t.iterateForVals(t.Root, make([]string, 0, t.Size))
+	return values
+}
+
+func (t *RBTree) iterateForKeys(start *Node, keys []string) []string {
+	if start == nil {
+		return keys
+	}
+
+	keys = t.iterateForKeys(start.Left, keys)
+	keys = append(keys, start.Key)
+	keys = t.iterateForKeys(start.Right, keys)
+
+	return keys
+}
+
+func (t *RBTree) iterateForVals(start *Node, values []string) []string {
+	if start == nil {
+		return values
+	}
+
+	values = t.iterateForVals(start.Left, values)
+	values = append(values, start.Value)
+	values = t.iterateForVals(start.Right, values)
+
+	return values
+}

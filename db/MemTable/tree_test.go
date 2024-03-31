@@ -1,6 +1,7 @@
 package memtable
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -123,6 +124,78 @@ func TestInsertWithRotation(t *testing.T) {
 	}
 }
 
+func TestIter(t *testing.T) {
+	tree := NewRBTree()
+	tree.Insert("5", "e")
+	tree.Insert("6", "f")
+	tree.Insert("7", "g")
+	tree.Insert("3", "c")
+	tree.Insert("4", "d")
+	tree.Insert("1", "x")
+	tree.Insert("2", "b")
+	tree.Insert("1", "a") //overwrite
+
+	keys := tree.Keys()
+	expected := []string{"1", "2", "3", "4", "5", "6", "7"}
+	if !slices.Equal(keys, expected) {
+		t.Errorf("expected %v and got %v", expected, keys)
+	}
+
+	values := tree.Values()
+	expected2 := []string{"a", "b", "c", "d", "e", "f", "g"}
+	if !slices.Equal(values, expected2) {
+		t.Errorf("expected %v and got %v", expected2, values)
+	}
+}
+
+/*
+func TestKeepCorrectOrderWithManyInserts(t *testing.T) {
+	tree := NewWithRoot(&Node{Key: "key4", Value: "value4", Color: black})
+
+	tree.Insert("key", "value")
+	tree.Insert("key2", "value2")
+	tree.Insert("key3", "value3")
+	tree.Insert("key5", "value5")
+	tree.Insert("key6", "value6")
+	tree.Insert("key7", "value7")
+	tree.Insert("key8", "value8")
+	tree.Insert("key9", "value9")
+	tree.Insert("key10", "value10")
+
+	if tree.Root.Key != "key4" {
+		t.Errorf("Expected root key %v, got %v", "key4", tree.Root.Key)
+	}
+
+	if tree.Root.Left.Key != "key2" {
+		t.Errorf("Expected left key %v, got %v", "key", tree.Root.Left.Key)
+	}
+
+	if tree.Root.Left.Left.Key != "key" {
+		t.Errorf("Expected left left key %v, got %v", "key", tree.Root.Left.Left.Key)
+	}
+
+	if tree.Root.Left.Right.Key != "key3" {
+		t.Errorf("Expected left right key %v, got %v", "key3", tree.Root.Left.Right.Key)
+	}
+
+	if tree.Root.Right.Key != "key6" {
+		t.Errorf("Expected right key %v, got %v", "key7", tree.Root.Right.Key)
+	}
+
+	if tree.Root.Right.Left.Key != "key5" {
+		t.Errorf("Expected right left key %v, got %v", "key5", tree.Root.Right.Left.Key)
+	}
+
+	if tree.Root.Right.Right.Key != "key7" {
+		t.Errorf("Expected right right key %v, got %v", "key7", tree.Root.Right.Right.Key)
+	}
+
+	if tree.Size != 10 {
+		t.Errorf("Expected size 10, got %v", tree.Size)
+	}
+}
+*/
+
 func TestGetFromTree(t *testing.T) {
 	tree := NewRBTree()
 	tree.Insert("key", "value")
@@ -138,4 +211,3 @@ func TestGetFromTree(t *testing.T) {
 		t.Errorf("Expected value 'value', got %v", value)
 	}
 }
-
