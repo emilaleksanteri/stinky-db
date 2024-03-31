@@ -27,6 +27,11 @@ type RBTree struct {
 	mu      sync.Mutex
 }
 
+type MemTable struct {
+	Tree *RBTree
+	mu   sync.Mutex
+}
+
 func NewRBTree() *RBTree {
 	return &RBTree{}
 }
@@ -259,4 +264,14 @@ func (t *RBTree) iterateForNodes(start *Node, nodes []Node) []Node {
 	nodes = t.iterateForNodes(start.Right, nodes)
 
 	return nodes
+}
+
+func (m *MemTable) SwapTree() *RBTree {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	currTree := m.Tree
+	m.Tree = NewRBTree()
+
+	return currTree
 }
