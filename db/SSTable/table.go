@@ -1,6 +1,9 @@
 package sstable
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
 	memtable "stinky-db/db/MemTable"
 	"strings"
 	"sync"
@@ -32,12 +35,11 @@ type SparseIndex struct {
 }
 
 type FileIndex struct {
-	Version    int `json:"version"`
+	//Version    int `json:"version"`
 	DataStart  int `json:"data_start"`
 	DataLen    int `json:"data_len"`
 	IndexStart int `json:"index_start"`
 	IndexLen   int `json:"index_len"`
-	PartSize   int `json:"part_size"`
 }
 
 // write order should be
@@ -45,14 +47,66 @@ type FileIndex struct {
 // Sparse Index
 // File Index -- should be fixed size in the file so that we can always index for this
 
-func (t *Table) writeToFile(filePath string) error {
+func (t *Table) writeToFile() error {
+	fileSparseIndex := map[string]SparseIndex{}
+	writeData := []byte{}
+	for i, keyVal := range t.Data {
+		bytes, err := json.Marshal(keyVal)
+		if err != nil {
+			return err
+		}
+		if i%sparseIdxSize == 0 {
+			sparseIdx := SparseIndex{
+				Len:   len(bytes),
+				Start: len(writeData),
+			}
+
+			fileSparseIndex[keyVal.Key] = sparseIdx
+		}
+		fmt.Println(string(bytes))
+		writeData = append(writeData, bytes...)
+	}
+
+	fileSparseBytes, err := json.Marshal(fileSparseIndex)
+	if err != nil {
+		return err
+	}
+
+	fileIdx := FileIndex{
+		DataStart:  0,
+		DataLen:    len(writeData),
+		IndexStart: len(writeData),
+		IndexLen:   len(fileSparseBytes),
+	}
+
+	fileIdxBytes, err := json.Marshal(fileIdx)
+	if err != nil {
+		return err
+	}
+
+	file, err := os.Create(t.FilePath)
+	defer file.Close()
+	if err != nil {
+		return err
+	}
+
+	_, err = file.Write(writeData)
+	if err != nil {
+
+		return err
+	}
+
+	_, err = file.Write(fileSparseBytes)
+	if err != nil {
+		return err
+	}
+
+	_, err = file.Write(fileIdxBytes)
+	if err != nil {
+		return err
+	}
 
 	return nil
-}
-
-func constructTableFromFile(filePath string) (Table, error) {
-
-	return Table{}, nil
 }
 
 func newTable(filePath string) Table {

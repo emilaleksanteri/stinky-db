@@ -52,3 +52,21 @@ func TestGetKeyFromMemSSTable(t *testing.T) {
 		}
 	}
 }
+
+func TestWriteTableToFile(t *testing.T) {
+	tree := memtable.NewRBTree()
+	tree.Insert("5", "e")
+	tree.Insert("6", "f")
+	tree.Insert("7", "g")
+	tree.Insert("3", "c")
+	tree.Insert("4", "d")
+	tree.Insert("1", "x")
+	tree.Insert("2", "b")
+
+	table := GenerateFromTree(tree, "./myfile")
+	err := table.writeToFile()
+	if err != nil {
+		t.Errorf("could not write data: %s", err.Error())
+	}
+
+}
