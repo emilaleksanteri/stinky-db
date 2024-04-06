@@ -4,15 +4,17 @@ import (
 	memtable "stinky-db/db/MemTable"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
-	sparseIdxSize = 2
+	sparseIdxSize = 4
 )
 
 type Data struct {
-	Key   string `json:"key"`
-	Value string `json:"Value"`
+	Key     string    `json:"key"`
+	Value   string    `json:"Value"`
+	Written time.Time `json:"Written"`
 }
 
 type Table struct {
@@ -66,7 +68,7 @@ func GenerateFromTree(mem *memtable.RBTree, filePath string) Table {
 	data := []Data{}
 	memSparseIndex := map[string]int{}
 	for i, node := range orderedNodes {
-		kv := Data{Key: node.Key, Value: node.Value}
+		kv := Data{Key: node.Key, Value: node.Value, Written: time.Now()}
 		data = append(data, kv)
 		if i%sparseIdxSize == 0 {
 			memSparseIndex[kv.Key] = i
@@ -80,9 +82,14 @@ func GenerateFromTree(mem *memtable.RBTree, filePath string) Table {
 
 func (t *Table) Get(key string) string {
 	if t.MemSparseIndex == nil {
+		//todo
 		return ""
 	}
 
+	return t.getFromMemorySSTable(key)
+}
+
+func (t *Table) getFromMemorySSTable(key string) string {
 	if idx, ok := t.MemSparseIndex[key]; ok {
 		return t.Data[idx].Value
 	}
@@ -97,8 +104,11 @@ func (t *Table) Get(key string) string {
 			prevKeyIdx = t.MemSparseIndex[memKey]
 		}
 	}
+	if finalKeyIdx == 0 {
+		finalKeyIdx = len(t.Data) - 1
+	}
 
-	for idx := prevKeyIdx; idx < finalKeyIdx; idx += 1 {
+	for idx := prevKeyIdx; idx <= finalKeyIdx; idx += 1 {
 		if t.Data[idx].Key == key {
 			return t.Data[idx].Value
 		}
