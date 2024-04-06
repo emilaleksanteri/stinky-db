@@ -283,6 +283,12 @@ func MemTableFromCache(cache map[string]string) *MemTable {
 	return &table
 }
 
+func NewMemTable() *MemTable {
+	return &MemTable{
+		mu: sync.Mutex{},
+	}
+}
+
 func (m *MemTable) InsertCache(cache map[string]string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

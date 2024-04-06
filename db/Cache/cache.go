@@ -16,8 +16,8 @@ type Cache struct {
 	maxLen int
 }
 
-func NewCache() *Cache {
-	return &Cache{values: make(map[string]string), mu: sync.Mutex{}}
+func NewCache(maxLen int) *Cache {
+	return &Cache{values: make(map[string]string), mu: sync.Mutex{}, maxLen: maxLen}
 }
 
 func (c *Cache) Get(key string) (string, bool) {
