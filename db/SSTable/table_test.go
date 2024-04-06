@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-func TestTableWrite(t *testing.T) {}
-
 func TestTableFromTree(t *testing.T) {
 	tree := memtable.NewRBTree()
 	tree.Insert("5", "e")

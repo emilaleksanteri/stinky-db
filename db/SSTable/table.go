@@ -10,8 +10,10 @@ import (
 )
 
 const (
-	sparseIdxSize = 999
+	sparseIdxSize = 4
 )
+
+var fileIdxSeparator = []byte{"$"[0], "$"[0]}
 
 type Data struct {
 	Key     string    `json:"key"`
@@ -95,6 +97,11 @@ func (t *Table) writeToFile() error {
 		return nil
 	}
 
+	_, err = file.Write(fileIdxSeparator)
+	if err != nil {
+		return err
+	}
+
 	_, err = file.Write(fileIdxBytes)
 	if err != nil {
 		return err
@@ -136,6 +143,12 @@ func GenerateFromTree(mem *memtable.RBTree, filePath string) Table {
 
 	table.Data = data
 	table.MemSparseIndex = memSparseIndex
+	return table
+}
+
+func GenerateFromDisk(filepath string) Table {
+	var table Table
+
 	return table
 }
 
