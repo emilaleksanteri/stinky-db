@@ -108,6 +108,7 @@ func (t *Table) writeToFile() error {
 	}
 
 	t.MemSparseIndex = nil
+	t.Data = nil
 
 	return nil
 }
@@ -215,13 +216,13 @@ func GenerateFromDisk(filepath string) (Table, error) {
 
 func (t *Table) Get(key string) (string, error) {
 	if t.MemSparseIndex == nil {
-		return t.readFromDisc(key)
+		return t.readFromDisk(key)
 	}
 
 	return t.getFromMemorySSTable(key)
 }
 
-func (t *Table) readFromDisc(key string) (string, error) {
+func (t *Table) readFromDisk(key string) (string, error) {
 	file, err := os.Open(t.FilePath)
 	if err != nil {
 		return "", err

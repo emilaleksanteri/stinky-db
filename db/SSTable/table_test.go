@@ -79,7 +79,7 @@ func TestWriteTableToFile(t *testing.T) {
 	}
 }
 
-func TestReadFromTableFile(t *testing.T) {
+func TestReadFromDisk(t *testing.T) {
 	defer os.Remove("./myfile")
 
 	tree := memtable.NewRBTree()
