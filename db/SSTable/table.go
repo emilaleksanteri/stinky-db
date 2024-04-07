@@ -146,10 +146,71 @@ func GenerateFromTree(mem *memtable.RBTree, filePath string) Table {
 	return table
 }
 
-func GenerateFromDisk(filepath string) Table {
+func GenerateFromDisk(filepath string) (Table, error) {
 	var table Table
+	mu := sync.Mutex{}
+	table.mu = &mu
+	table.FilePath = filepath
 
-	return table
+	file, err := os.Open(filepath)
+	if err != nil {
+		return table, err
+	}
+	defer file.Close()
+
+	fileStats, err := file.Stat()
+	if err != nil {
+		return table, err
+	}
+
+	fileSize := fileStats.Size()
+	bytesToReadForIndex := make([]byte, 100) // fileindex is always smaller than 100 bytes
+	_, err = file.ReadAt(bytesToReadForIndex, fileSize-100)
+	if err != nil {
+		return table, err
+	}
+
+	indexBytes := []byte{}
+	allowedToRead := false
+	for index := 0; index < len(bytesToReadForIndex); index += 1 {
+		currRune := bytesToReadForIndex[index]
+		nextRune := "0"[0]
+		if index+1 != len(bytesToReadForIndex) {
+			nextRune = bytesToReadForIndex[index+1]
+		}
+		if currRune == '$' && nextRune == '$' {
+			allowedToRead = true
+		}
+
+		if !allowedToRead || currRune == '$' {
+			continue
+		} else {
+			indexBytes = append(indexBytes, currRune)
+		}
+	}
+
+	fileIndex := FileIndex{}
+	err = json.Unmarshal(indexBytes, &fileIndex)
+	if err != nil {
+		return table, err
+	}
+
+	sparseIndexBytes := make([]byte, fileIndex.IndexLen)
+	_, err = file.ReadAt(sparseIndexBytes, int64(fileIndex.IndexStart))
+	if err != nil {
+		return table, err
+	}
+
+	sparseIdx := map[string]SparseIndex{}
+	err = json.Unmarshal(sparseIndexBytes, &sparseIdx)
+	if err != nil {
+		return table, err
+	}
+
+	table.FileIndex = fileIndex
+	table.SparseIndex = sparseIdx
+
+	return table, nil
 }
 
 func (t *Table) Get(key string) (string, error) {
@@ -186,7 +247,6 @@ func (t *Table) readFromDisc(key string) (string, error) {
 		higherOrBigger := strings.Compare(idxKey, key)
 		if higherOrBigger == 1 {
 			finalKeyIdx = val.Start
-			break
 		} else {
 			prevKeyIdx = val.Start + val.Len
 		}
@@ -246,7 +306,6 @@ func (t *Table) getFromMemorySSTable(key string) (string, error) {
 		higherOrBigger := strings.Compare(memKey, key)
 		if higherOrBigger == 1 {
 			finalKeyIdx = t.MemSparseIndex[memKey]
-			break
 		} else {
 			prevKeyIdx = t.MemSparseIndex[memKey]
 		}

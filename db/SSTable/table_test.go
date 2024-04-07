@@ -2,6 +2,7 @@ package sstable
 
 import (
 	"os"
+	"reflect"
 	memtable "stinky-db/db/MemTable"
 	"testing"
 )
@@ -115,5 +116,33 @@ func TestReadFromTableFile(t *testing.T) {
 		if gotten != val {
 			t.Errorf("expected to get %s, got %s", val, gotten)
 		}
+	}
+}
+
+func TestRestoreTableFromDisk(t *testing.T) {
+	filepath := "./my_test_file"
+	wantedFileIndx := FileIndex{
+		DataStart:  0,
+		DataLen:    476,
+		IndexStart: 476,
+		IndexLen:   53,
+	}
+
+	wantedSparseIndex := map[string]SparseIndex{
+		"1": {Len: 68, Start: 0},
+		"5": {Len: 68, Start: 272},
+	}
+
+	table, err := GenerateFromDisk(filepath)
+	if err != nil {
+		t.Errorf("could not generate table from disk: %s", err.Error())
+	}
+
+	if table.FileIndex != wantedFileIndx {
+		t.Errorf("wanted file index %+v, got %+v", wantedFileIndx, table.FileIndex)
+	}
+
+	if !reflect.DeepEqual(table.SparseIndex, wantedSparseIndex) {
+		t.Errorf("wanted sparse index %+v, got %+v", wantedSparseIndex, table.SparseIndex)
 	}
 }
