@@ -68,7 +68,7 @@ func TestWriteTableToFile(t *testing.T) {
 	tree.Insert("2", "b")
 
 	table := GenerateFromTree(tree, "./myfile")
-	err := table.writeToFile()
+	err := table.WriteToFile()
 	if err != nil {
 		t.Errorf("could not write data: %s", err.Error())
 	}
@@ -92,7 +92,7 @@ func TestReadFromDisk(t *testing.T) {
 	tree.Insert("2", "b")
 
 	table := GenerateFromTree(tree, "./myfile")
-	err := table.writeToFile()
+	err := table.WriteToFile()
 	if err != nil {
 		t.Errorf("could not write data: %s", err.Error())
 	}

@@ -2,7 +2,6 @@ package memtable
 
 import (
 	"slices"
-	memtable "stinky-db/db/MemTable"
 	"testing"
 )
 

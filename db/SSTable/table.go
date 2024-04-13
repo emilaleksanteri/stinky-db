@@ -26,6 +26,7 @@ type Table struct {
 	SparseIndex    map[string]SparseIndex `json:"sparse_index"`
 	FileIndex      FileIndex              `json:"file_index"`
 	FilePath       string
+	Size           int
 	MemSparseIndex map[string]int
 	mu             *sync.Mutex
 }
@@ -43,7 +44,7 @@ type FileIndex struct {
 	IndexLen   int `json:"index_len"`
 }
 
-func (t *Table) writeToFile() error {
+func (t *Table) WriteToFile() error {
 	fileSparseIndex := map[string]SparseIndex{}
 	writeData := []byte{}
 	for i, keyVal := range t.Data {
@@ -134,24 +135,84 @@ func GenerateFromTree(mem *memtable.RBTree, filePath string) Table {
 	orderedNodes := mem.Nodes()
 	data := []Data{}
 	memSparseIndex := map[string]int{}
+	numOfElements := 0
 	for i, node := range orderedNodes {
 		kv := Data{Key: node.Key, Value: node.Value, Written: time.Now()}
 		data = append(data, kv)
 		if i%sparseIdxSize == 0 {
 			memSparseIndex[kv.Key] = i
 		}
+		numOfElements += 1
 	}
 
 	table.Data = data
 	table.MemSparseIndex = memSparseIndex
+	table.Size = numOfElements
 	return table
 }
 
+func (t *Table) GetAllElements() ([]Data, error) {
+	var data []Data
+	file, err := os.Open(t.FilePath)
+	if err != nil {
+		return data, err
+	}
+
+	bytesToRead := make([]byte, t.FileIndex.DataLen)
+	_, err = file.ReadAt(bytesToRead, int64(t.FileIndex.DataStart))
+	if err != nil {
+		return data, err
+	}
+
+	jsonBytes := make([]byte, len(bytesToRead)+2)
+	jsonBytes = append(jsonBytes, '[')
+	jsonBytes = append(jsonBytes, bytesToRead...)
+	jsonBytes = append(jsonBytes, ']')
+
+	err = json.Unmarshal(jsonBytes, &data)
+	if err != nil {
+		return data, err
+	}
+
+	return data, nil
+}
+
+func (t *Table) GetNumOfElements() (int, error) {
+	var count int
+	file, err := os.Open(t.FilePath)
+	if err != nil {
+		return count, err
+	}
+
+	bytesToRead := make([]byte, t.FileIndex.DataLen)
+	_, err = file.ReadAt(bytesToRead, int64(t.FileIndex.DataStart))
+	if err != nil {
+		return count, err
+	}
+
+	numOfLBraces := 0
+	numOfRBraces := 0
+	for idx := 0; idx < len(bytesToRead); idx += 1 {
+		if bytesToRead[idx] == '{' {
+			numOfLBraces += 1
+		}
+
+		if bytesToRead[idx] == '}' {
+			numOfRBraces += 1
+		}
+
+		if numOfRBraces == numOfLBraces {
+			numOfLBraces = 0
+			numOfRBraces = 0
+			count += 1
+		}
+	}
+
+	return count, nil
+}
+
 func GenerateFromDisk(filepath string) (Table, error) {
-	var table Table
-	mu := sync.Mutex{}
-	table.mu = &mu
-	table.FilePath = filepath
+	table := newTable(filepath)
 
 	file, err := os.Open(filepath)
 	if err != nil {
@@ -210,6 +271,13 @@ func GenerateFromDisk(filepath string) (Table, error) {
 
 	table.FileIndex = fileIndex
 	table.SparseIndex = sparseIdx
+
+	tableSize, err := table.GetNumOfElements()
+	if err != nil {
+		return table, err
+	}
+
+	table.Size = tableSize
 
 	return table, nil
 }
@@ -322,4 +390,10 @@ func (t *Table) getFromMemorySSTable(key string) (string, error) {
 	}
 
 	return "", nil
+}
+
+func (t *Table) BreakIntoChunks() ([]Table, error) {
+	var tables []Table
+
+	return tables, nil
 }
