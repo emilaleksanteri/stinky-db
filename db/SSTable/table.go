@@ -31,6 +31,11 @@ type Table struct {
 	mu             *sync.Mutex
 }
 
+type MinMax struct {
+	StartKey string `json:"start_key"`
+	EndKey   string `json:"end_key"`
+}
+
 type SparseIndex struct {
 	Len   int `json:"len"`
 	Start int `json:"start"`
@@ -38,10 +43,11 @@ type SparseIndex struct {
 
 type FileIndex struct {
 	//Version    int `json:"version"`
-	DataStart  int `json:"data_start"`
-	DataLen    int `json:"data_len"`
-	IndexStart int `json:"index_start"`
-	IndexLen   int `json:"index_len"`
+	DataStart  int    `json:"data_start"`
+	DataLen    int    `json:"data_len"`
+	IndexStart int    `json:"index_start"`
+	IndexLen   int    `json:"index_len"`
+	MinMax     MinMax `json:"min_max"`
 }
 
 func (t *Table) WriteToFile() error {
@@ -74,6 +80,10 @@ func (t *Table) WriteToFile() error {
 		DataLen:    len(writeData),
 		IndexStart: len(writeData),
 		IndexLen:   len(fileSparseBytes),
+		MinMax: MinMax{
+			StartKey: t.Data[0].Key,
+			EndKey:   t.Data[len(t.Data)-1].Key,
+		},
 	}
 	t.FileIndex = fileIdx
 
@@ -135,19 +145,17 @@ func GenerateFromTree(mem *memtable.RBTree, filePath string) Table {
 	orderedNodes := mem.Nodes()
 	data := []Data{}
 	memSparseIndex := map[string]int{}
-	numOfElements := 0
 	for i, node := range orderedNodes {
 		kv := Data{Key: node.Key, Value: node.Value, Written: time.Now()}
 		data = append(data, kv)
 		if i%sparseIdxSize == 0 {
 			memSparseIndex[kv.Key] = i
 		}
-		numOfElements += 1
 	}
 
 	table.Data = data
 	table.MemSparseIndex = memSparseIndex
-	table.Size = numOfElements
+	table.Size = mem.GetSize()
 	return table
 }
 
@@ -226,8 +234,8 @@ func GenerateFromDisk(filepath string) (Table, error) {
 	}
 
 	fileSize := fileStats.Size()
-	bytesToReadForIndex := make([]byte, 100) // fileindex is always smaller than 100 bytes
-	_, err = file.ReadAt(bytesToReadForIndex, fileSize-100)
+	bytesToReadForIndex := make([]byte, 150) // fileindex is always smaller than 150 bytes
+	_, err = file.ReadAt(bytesToReadForIndex, fileSize-150)
 	if err != nil {
 		return table, err
 	}
@@ -310,22 +318,22 @@ func (t *Table) readFromDisk(key string) (string, error) {
 		return data.Value, nil
 	}
 
-	prevKeyIdx := 0
+	startKeyIdx := 0
 	finalKeyIdx := 0
 	for idxKey, val := range t.SparseIndex {
-		higherOrBigger := strings.Compare(idxKey, key)
-		if higherOrBigger == 1 {
+		smallerOrBigger := strings.Compare(idxKey, key)
+		if smallerOrBigger == 1 {
 			finalKeyIdx = val.Start
 		} else {
-			prevKeyIdx = val.Start + val.Len
+			startKeyIdx = val.Start + val.Len
 		}
 	}
 	if finalKeyIdx == 0 {
 		finalKeyIdx = t.FileIndex.DataLen - 1
 	}
 
-	bytesToParse := make([]byte, finalKeyIdx-prevKeyIdx+1)
-	_, err = file.ReadAt(bytesToParse, int64(prevKeyIdx))
+	bytesToParse := make([]byte, finalKeyIdx-startKeyIdx+1)
+	_, err = file.ReadAt(bytesToParse, int64(startKeyIdx))
 	if err != nil {
 		return "", err
 	}
@@ -369,31 +377,25 @@ func (t *Table) getFromMemorySSTable(key string) (string, error) {
 		return t.Data[idx].Value, nil
 	}
 
-	prevKeyIdx := 0
+	startKeyIdx := 0
 	finalKeyIdx := 0
 	for memKey := range t.MemSparseIndex {
-		higherOrBigger := strings.Compare(memKey, key)
-		if higherOrBigger == 1 {
+		smallerOrBigger := strings.Compare(memKey, key)
+		if smallerOrBigger == 1 {
 			finalKeyIdx = t.MemSparseIndex[memKey]
 		} else {
-			prevKeyIdx = t.MemSparseIndex[memKey]
+			startKeyIdx = t.MemSparseIndex[memKey]
 		}
 	}
 	if finalKeyIdx == 0 {
 		finalKeyIdx = len(t.Data) - 1
 	}
 
-	for idx := prevKeyIdx; idx <= finalKeyIdx; idx += 1 {
+	for idx := startKeyIdx; idx <= finalKeyIdx; idx += 1 {
 		if t.Data[idx].Key == key {
 			return t.Data[idx].Value, nil
 		}
 	}
 
 	return "", nil
-}
-
-func (t *Table) BreakIntoChunks() ([]Table, error) {
-	var tables []Table
-
-	return tables, nil
 }

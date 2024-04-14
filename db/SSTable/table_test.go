@@ -126,6 +126,10 @@ func TestRestoreTableFromDisk(t *testing.T) {
 		DataLen:    476,
 		IndexStart: 476,
 		IndexLen:   53,
+		MinMax: MinMax{
+			StartKey: "1",
+			EndKey:   "7",
+		},
 	}
 
 	wantedSparseIndex := map[string]SparseIndex{
