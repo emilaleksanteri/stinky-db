@@ -150,3 +150,47 @@ func TestRestoreTableFromDisk(t *testing.T) {
 		t.Errorf("wanted sparse index %+v, got %+v", wantedSparseIndex, table.SparseIndex)
 	}
 }
+
+func TestGetAllElements(t *testing.T) {
+	defer os.Remove("./myfile")
+
+	tree := memtable.NewRBTree()
+	tree.Insert("5", "e")
+	tree.Insert("6", "f")
+	tree.Insert("7", "g")
+	tree.Insert("3", "c")
+	tree.Insert("4", "d")
+	tree.Insert("1", "x")
+	tree.Insert("2", "b")
+
+	table := GenerateFromTree(tree, "./myfile")
+	err := table.WriteToFile()
+	if err != nil {
+		t.Errorf("could not write data: %s", err.Error())
+	}
+
+	elements, err := table.GetAllElements()
+	if err != nil {
+		t.Errorf("could not get all elements: %v\n", err)
+	}
+
+	expectedPairs := []Data{
+		{Key: "1", Value: "x"},
+		{Key: "2", Value: "b"},
+		{Key: "3", Value: "c"},
+		{Key: "4", Value: "d"},
+		{Key: "5", Value: "e"},
+		{Key: "6", Value: "f"},
+		{Key: "7", Value: "g"},
+	}
+
+	if len(elements) != len(expectedPairs) {
+		t.Errorf("expected num of elements: %d, got %d", len(expectedPairs), len(elements))
+	}
+
+	for i, val := range expectedPairs {
+		if elements[i].Value != val.Value && elements[i].Key != val.Key {
+			t.Errorf("expected at i %d, key: %s and val: %s but got key: %s and val: %s\n", i, val.Key, val.Value, elements[i].Key, elements[i].Value)
+		}
+	}
+}

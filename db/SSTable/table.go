@@ -19,6 +19,7 @@ type Data struct {
 	Key     string    `json:"key"`
 	Value   string    `json:"value"`
 	Written time.Time `json:"written"`
+	Delete  bool      `json:"delete"`
 }
 
 type Table struct {
@@ -172,14 +173,33 @@ func (t *Table) GetAllElements() ([]Data, error) {
 		return data, err
 	}
 
-	jsonBytes := make([]byte, len(bytesToRead)+2)
-	jsonBytes = append(jsonBytes, '[')
-	jsonBytes = append(jsonBytes, bytesToRead...)
-	jsonBytes = append(jsonBytes, ']')
+	numOfLBraces := 0
+	numOfRBraces := 0
+	currReading := []byte{}
+	for idx := 0; idx < len(bytesToRead); idx += 1 {
+		if bytesToRead[idx] == '{' {
+			numOfLBraces += 1
+		}
 
-	err = json.Unmarshal(jsonBytes, &data)
-	if err != nil {
-		return data, err
+		if bytesToRead[idx] == '}' {
+			numOfRBraces += 1
+		}
+
+		currReading = append(currReading, bytesToRead[idx])
+
+		if numOfRBraces == numOfLBraces {
+			numOfLBraces = 0
+			numOfRBraces = 0
+
+			keyVal := Data{}
+			err := json.Unmarshal(currReading, &keyVal)
+			if err != nil {
+				return data, err
+			}
+
+			data = append(data, keyVal)
+			currReading = []byte{}
+		}
 	}
 
 	return data, nil
