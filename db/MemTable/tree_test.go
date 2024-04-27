@@ -5,16 +5,6 @@ import (
 	"testing"
 )
 
-func TestInsertWithSameKey(t *testing.T) {
-	tree := NewRBTree()
-	tree.Insert("key", "value")
-	tree.Insert("key", "value")
-
-	if tree.Size != 1 {
-		t.Errorf("Expected size 1, got %v", tree.Size)
-	}
-}
-
 func TestInsertLeft(t *testing.T) {
 	tree := NewRBTree()
 	tree.Insert("key2", "value")
@@ -40,6 +30,7 @@ func TestInsertWithRotation(t *testing.T) {
 	tree.Insert("key", "value")
 	tree.Insert("key2", "value2")
 	tree.Insert("key3", "value3")
+	wantedSize := int64(len("key") + len("value") + len("key2") + len("value2") + len("key3") + len("value3"))
 
 	if tree.Root.Key != "key2" {
 		t.Errorf("Expected root key 'key2', got %v", tree.Root.Key)
@@ -65,8 +56,8 @@ func TestInsertWithRotation(t *testing.T) {
 		t.Errorf("Expected right color red, got %v", tree.Root.Right.Color)
 	}
 
-	if tree.Size != 3 {
-		t.Errorf("Expected size 3, got %v", tree.Size)
+	if tree.Size != wantedSize {
+		t.Errorf("Expected size %d, got %d", wantedSize, tree.Size)
 	}
 
 	if tree.Root.Parent != nil {

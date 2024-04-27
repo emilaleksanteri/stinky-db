@@ -22,8 +22,8 @@ type Node struct {
 
 type RBTree struct {
 	Root    *Node
-	Size    int
-	MaxSize int
+	Size    int64
+	MaxSize int64
 }
 
 type MemTable struct {
@@ -45,11 +45,11 @@ const (
 	KEY_EQUAL_NODE   = 0
 )
 
-func (t *RBTree) GetSize() int {
+func (t *RBTree) GetSize() int64 {
 	return t.Size
 }
 
-func (t *RBTree) GetMaxSize() int {
+func (t *RBTree) GetMaxSize() int64 {
 	return t.MaxSize
 }
 
@@ -60,7 +60,7 @@ func (t *RBTree) AtMaxSize() bool {
 func (t *RBTree) Insert(key, value string) {
 	if t.Root == nil {
 		t.Root = &Node{Key: key, Value: value, Color: black}
-		t.Size += 1
+		t.Size += int64(len(key) + len(value))
 		return
 	}
 
@@ -73,7 +73,7 @@ func (t *RBTree) Insert(key, value string) {
 		case KEY_LESS_NODE:
 			if node.Left == nil {
 				node.Left = &Node{Key: key, Value: value, Color: red, Parent: node}
-				t.Size += 1
+				t.Size += int64(len(key) + len(value))
 				inserted = node.Left
 				running = false
 			} else {
@@ -82,13 +82,16 @@ func (t *RBTree) Insert(key, value string) {
 		case KEY_GREATER_NODE:
 			if node.Right == nil {
 				node.Right = &Node{Key: key, Value: value, Color: red, Parent: node}
-				t.Size += 1
+				t.Size += int64(len(key) + len(value))
 				inserted = node.Right
 				running = false
 			} else {
 				node = node.Right
 			}
 		case KEY_EQUAL_NODE:
+			t.Size -= int64(len(node.Value))
+			t.Size += int64(len(value))
+
 			node.Value = value
 			inserted = node
 			running = false
