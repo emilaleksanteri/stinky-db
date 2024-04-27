@@ -5,57 +5,8 @@ import (
 	"reflect"
 	memtable "stinky-db/db/MemTable"
 	"testing"
+	"time"
 )
-
-func TestTableFromTree(t *testing.T) {
-	tree := memtable.NewRBTree()
-	tree.Insert("5", "e")
-	tree.Insert("6", "f")
-	tree.Insert("7", "g")
-	tree.Insert("3", "c")
-	tree.Insert("4", "d")
-	tree.Insert("1", "x")
-	tree.Insert("2", "b")
-
-	table := GenerateFromTree(tree, "./myfile")
-	if len(table.Data) != tree.Size {
-		t.Errorf("expected to have table size %d, got %d", tree.Size, len(table.Data))
-	}
-}
-
-func TestGetKeyFromMemSSTable(t *testing.T) {
-	tree := memtable.NewRBTree()
-	tree.Insert("5", "e")
-	tree.Insert("6", "f")
-	tree.Insert("7", "g")
-	tree.Insert("3", "c")
-	tree.Insert("4", "d")
-	tree.Insert("1", "x")
-	tree.Insert("2", "b")
-
-	table := GenerateFromTree(tree, "./myfile")
-
-	toGet := map[string]string{
-		"5": "e",
-		"6": "f",
-		"7": "g",
-		"3": "c",
-		"4": "d",
-		"1": "x",
-		"2": "b",
-	}
-
-	for key, val := range toGet {
-		gotten, err := table.Get(key)
-		if err != nil {
-			t.Errorf("got an error reading data: %s", err.Error())
-		}
-
-		if gotten != val {
-			t.Errorf("expected to get %s, got %s", val, gotten)
-		}
-	}
-}
 
 func TestWriteTableToFile(t *testing.T) {
 	tree := memtable.NewRBTree()
@@ -67,8 +18,7 @@ func TestWriteTableToFile(t *testing.T) {
 	tree.Insert("1", "x")
 	tree.Insert("2", "b")
 
-	table := GenerateFromTree(tree, "./myfile")
-	err := table.WriteToFile()
+	_, err := GenerateFromTree(tree, "./myfile")
 	if err != nil {
 		t.Errorf("could not write data: %s", err.Error())
 	}
@@ -91,8 +41,7 @@ func TestReadFromDisk(t *testing.T) {
 	tree.Insert("1", "x")
 	tree.Insert("2", "b")
 
-	table := GenerateFromTree(tree, "./myfile")
-	err := table.WriteToFile()
+	table, err := GenerateFromTree(tree, "./myfile")
 	if err != nil {
 		t.Errorf("could not write data: %s", err.Error())
 	}
@@ -163,8 +112,7 @@ func TestGetAllElements(t *testing.T) {
 	tree.Insert("1", "x")
 	tree.Insert("2", "b")
 
-	table := GenerateFromTree(tree, "./myfile")
-	err := table.WriteToFile()
+	table, err := GenerateFromTree(tree, "./myfile")
 	if err != nil {
 		t.Errorf("could not write data: %s", err.Error())
 	}
@@ -191,6 +139,54 @@ func TestGetAllElements(t *testing.T) {
 	for i, val := range expectedPairs {
 		if elements[i].Value != val.Value && elements[i].Key != val.Key {
 			t.Errorf("expected at i %d, key: %s and val: %s but got key: %s and val: %s\n", i, val.Key, val.Value, elements[i].Key, elements[i].Value)
+		}
+	}
+}
+
+func TestGenerateFromData(t *testing.T) {
+	location, err := time.LoadLocation("")
+	if err != nil {
+		t.Errorf("invalid location data: %s\n", err.Error())
+		return
+	}
+
+	repeatDate := time.Date(2024, time.January, 1, 1, 1, 1, 1, location)
+	febDate := time.Date(2024, time.February, 1, 1, 1, 1, 1, location)
+	marDate := time.Date(2024, time.March, 1, 1, 1, 1, 1, location)
+	aprDate := time.Date(2024, time.April, 1, 1, 1, 1, 1, location)
+
+	dataToInsert := []Data{
+		{Key: "1", Value: "xxx", Written: aprDate},
+		{Key: "5", Value: "e", Written: repeatDate},
+		{Key: "1", Value: "x", Written: repeatDate},
+		{Key: "2", Value: "b", Written: repeatDate},
+		{Key: "3", Value: "c", Written: repeatDate},
+		{Key: "4", Value: "d", Written: repeatDate},
+		{Key: "1", Value: "yyy", Written: marDate},
+		{Key: "6", Value: "f", Written: repeatDate},
+		{Key: "7", Value: "g", Written: repeatDate},
+		{Key: "1", Value: "xyz", Written: febDate},
+	}
+
+	expectedData := []Data{
+		{Key: "1", Value: "xxx", Written: aprDate},
+		{Key: "2", Value: "b", Written: repeatDate},
+		{Key: "3", Value: "c", Written: repeatDate},
+		{Key: "4", Value: "d", Written: repeatDate},
+		{Key: "5", Value: "e", Written: repeatDate},
+		{Key: "6", Value: "f", Written: repeatDate},
+		{Key: "7", Value: "g", Written: repeatDate},
+	}
+
+	table := GenerateFromData(dataToInsert, "")
+	if len(table.Data) != len(expectedData) {
+		t.Errorf("data is not same len as expected data, got %d, expected %d", len(expectedData), len(table.Data))
+		return
+	}
+
+	for i, keyval := range table.Data {
+		if !reflect.DeepEqual(keyval, expectedData[i]) {
+			t.Errorf("table keyval %+v did not match wanted keyval %+v\n", keyval, expectedData[i])
 		}
 	}
 }

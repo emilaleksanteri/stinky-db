@@ -53,3 +53,19 @@ func NewTree(dataDir string) (LSMTree, error) {
 
 	return lsmtree, nil
 }
+
+func (lsm *LSMTree) compactLayer0() (*sstable.Table, error) {
+	mergedData := []sstable.Data{}
+	for _, ss := range lsm.Level_0 {
+		err := ss.Table.ReadIntoMem()
+		if err != nil {
+			return nil, err
+		}
+
+		mergedData = slices.Concat(mergedData, ss.Table.Data)
+	}
+
+	mergedSS := sstable.GenerateFromData(mergedData, compaction_dir+"/layer_0")
+
+	return &mergedSS, nil
+}

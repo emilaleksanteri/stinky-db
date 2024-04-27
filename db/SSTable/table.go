@@ -3,7 +3,9 @@ package sstable
 import (
 	"encoding/json"
 	"os"
+	"sort"
 	memtable "stinky-db/db/MemTable"
+	"stinky-db/db/util"
 	"strings"
 	"sync"
 	"time"
@@ -23,13 +25,29 @@ type Data struct {
 }
 
 type Table struct {
-	Data           []Data                 `json:"data"`
-	SparseIndex    map[string]SparseIndex `json:"sparse_index"`
-	FileIndex      FileIndex              `json:"file_index"`
-	FilePath       string
-	Size           int64
-	MemSparseIndex map[string]int
-	mu             *sync.Mutex
+	Data        []Data                 `json:"data"`
+	SparseIndex map[string]SparseIndex `json:"sparse_index"`
+	FileIndex   FileIndex              `json:"file_index"`
+	FilePath    string
+	Size        int64
+	mu          *sync.Mutex
+}
+
+func (t *Table) Len() int {
+	return len(t.Data)
+}
+
+func (t *Table) Swap(i, j int) {
+	t.Data[i], t.Data[j] = t.Data[j], t.Data[i]
+}
+
+func (t *Table) Less(i, j int) bool {
+	compared := strings.Compare(t.Data[i].Key, t.Data[j].Key)
+	return compared == -1
+}
+
+func (t *Table) SortData() {
+	sort.Sort(t)
 }
 
 type MinMax struct {
@@ -119,7 +137,6 @@ func (t *Table) WriteToFile() error {
 		return err
 	}
 
-	t.MemSparseIndex = nil
 	t.Data = nil
 
 	return nil
@@ -141,21 +158,51 @@ func newTable(filePath string) Table {
 	}
 }
 
-func GenerateFromTree(mem *memtable.RBTree, filePath string) Table {
+func GenerateFromTree(mem *memtable.RBTree, filePath string) (Table, error) {
 	table := newTable(filePath)
 	orderedNodes := mem.Nodes()
 	data := []Data{}
-	memSparseIndex := map[string]int{}
-	for i, node := range orderedNodes {
+	for _, node := range orderedNodes {
 		kv := Data{Key: node.Key, Value: node.Value, Written: time.Now()}
 		data = append(data, kv)
-		if i%sparseIdxSize == 0 {
-			memSparseIndex[kv.Key] = i
-		}
 	}
 
 	table.Data = data
-	table.MemSparseIndex = memSparseIndex
+	if err := table.WriteToFile(); err != nil {
+		return table, err
+	}
+
+	return table, nil
+}
+
+
+
+// GenerateFromData does not write the SSTable to disk, this is used for compaction operations
+func GenerateFromData(data []Data, filePath string) Table {
+	table := newTable(filePath)
+	table.Data = data
+	table.SortData()
+
+	compacted := util.CompactFunc(table.Data, func(first, second *Data) bool {
+		if first.Key != second.Key {
+			return false
+		}
+
+		firstIsNewer := first.Written.Unix() > second.Written.Unix()
+		if firstIsNewer {
+			second.Value = first.Value
+			second.Written = first.Written
+		}
+
+		if second.Delete {
+			first.Delete = second.Delete
+		}
+
+		return true
+	})
+
+	table.Data = compacted
+
 	return table
 }
 
@@ -312,17 +359,13 @@ func GenerateFromDisk(filepath string) (Table, error) {
 	table.FileIndex = fileIndex
 	table.SparseIndex = sparseIdx
 
-	table.Size = fileSize
+	table.Size = int64(fileIndex.DataLen)
 
 	return table, nil
 }
 
 func (t *Table) Get(key string) (string, error) {
-	if t.MemSparseIndex == nil {
-		return t.readFromDisk(key)
-	}
-
-	return t.getFromMemorySSTable(key)
+	return t.readFromDisk(key)
 }
 
 func (t *Table) readFromDisk(key string) (string, error) {
@@ -393,34 +436,6 @@ func (t *Table) readFromDisk(key string) (string, error) {
 				numOfRBraces = 0
 				objRead = []byte{}
 			}
-		}
-	}
-
-	return "", nil
-}
-
-func (t *Table) getFromMemorySSTable(key string) (string, error) {
-	if idx, ok := t.MemSparseIndex[key]; ok {
-		return t.Data[idx].Value, nil
-	}
-
-	startKeyIdx := 0
-	finalKeyIdx := 0
-	for memKey := range t.MemSparseIndex {
-		smallerOrBigger := strings.Compare(memKey, key)
-		if smallerOrBigger == 1 {
-			finalKeyIdx = t.MemSparseIndex[memKey]
-		} else {
-			startKeyIdx = t.MemSparseIndex[memKey]
-		}
-	}
-	if finalKeyIdx == 0 {
-		finalKeyIdx = len(t.Data) - 1
-	}
-
-	for idx := startKeyIdx; idx <= finalKeyIdx; idx += 1 {
-		if t.Data[idx].Key == key {
-			return t.Data[idx].Value, nil
 		}
 	}
 
