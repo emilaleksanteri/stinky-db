@@ -15,9 +15,10 @@ type LSMTreeNode struct {
 }
 
 type LSMTree struct {
-	Level_0 []LSMTreeNode
-	Layers  []LSMTreeNode
-	DataDir string
+	Level_0       []LSMTreeNode
+	Layers        []LSMTreeNode
+	DataDir       string
+	CompactionDir string
 }
 
 var (
@@ -37,7 +38,7 @@ func NewNode(ss *sstable.Table) LSMTreeNode {
 	}
 }
 
-func NewTree(dataDir string) (LSMTree, error) {
+func NewTree(dataDir, compactionDir string) (LSMTree, error) {
 	var lsmtree LSMTree
 
 	files, err := os.ReadDir(dataDir)
@@ -71,6 +72,7 @@ func NewTree(dataDir string) (LSMTree, error) {
 	lsmtree.DataDir = dataDir
 	lsmtree.Layers = tables
 	lsmtree.Level_0 = layer0
+	lsmtree.CompactionDir = compactionDir
 
 	return lsmtree, nil
 }
@@ -84,14 +86,22 @@ func (lsm *LSMTree) getLayer0NameNum() int {
 }
 
 func (lsm *LSMTree) InsertMemtable(mem *memtable.RBTree) error {
-	if len(lsm.Level_0) != lvl_0_max_len {
-		ss, err := sstable.GenerateFromTree(mem, fmt.Sprintf("%s/%s0_%d", lsm.DataDir, layer_prefix, lsm.getLayer0NameNum()))
-		if err != nil {
-			return err
-		}
-
-		lsm.Level_0 = append(lsm.Level_0, NewNode(&ss))
+	ss, err := sstable.GenerateFromTree(mem, fmt.Sprintf("%s/%s0_%d", lsm.DataDir, layer_prefix, lsm.getLayer0NameNum()))
+	if err != nil {
+		return err
 	}
+
+	if len(lsm.Level_0) != lvl_0_max_len {
+		lsm.Level_0 = append(lsm.Level_0, NewNode(&ss))
+		return nil
+	}
+	err = lsm.compact()
+	if err != nil {
+		return err
+	}
+
+	newLvl0 := []LSMTreeNode{NewNode(&ss)}
+	lsm.Level_0 = newLvl0
 
 	return nil
 }
@@ -107,7 +117,26 @@ func (lsm *LSMTree) compactLayer0() (*sstable.Table, error) {
 		mergedData = slices.Concat(mergedData, ss.Table.Data)
 	}
 
-	mergedSS := sstable.GenerateFromData(mergedData, compaction_dir+"/layer_0")
+	mergedSS := sstable.GenerateFromData(mergedData, lsm.CompactionDir+"/layer_0")
 
 	return &mergedSS, nil
+}
+
+func (lsm *LSMTree) compact() error {
+	compacted0, err := lsm.compactLayer0()
+	if err != nil {
+		return err
+	}
+
+	if len(lsm.Layers) == 0 {
+		compacted0.FilePath = fmt.Sprintf("%s%s0_1", lsm.DataDir, layer_prefix)
+		err = compacted0.WriteToFile()
+		if err != nil {
+			return err
+		}
+		lsm.Layers = append(lsm.Layers, NewNode(compacted0))
+		return nil
+	}
+
+	return nil
 }
