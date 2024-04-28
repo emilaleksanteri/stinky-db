@@ -175,8 +175,6 @@ func GenerateFromTree(mem *memtable.RBTree, filePath string) (Table, error) {
 	return table, nil
 }
 
-
-
 // GenerateFromData does not write the SSTable to disk, this is used for compaction operations
 func GenerateFromData(data []Data, filePath string) Table {
 	table := newTable(filePath)
@@ -195,7 +193,7 @@ func GenerateFromData(data []Data, filePath string) Table {
 		}
 
 		if second.Delete {
-			first.Delete = second.Delete
+			second.Delete = first.Delete
 		}
 
 		return true

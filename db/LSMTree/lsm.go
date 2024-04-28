@@ -82,26 +82,32 @@ func (lsm *LSMTree) getLayer0NameNum() int {
 		return 1
 	}
 
-	return len(lsm.Level_0)
+	return len(lsm.Level_0) + 1
 }
 
 func (lsm *LSMTree) InsertMemtable(mem *memtable.RBTree) error {
+	if len(lsm.Level_0) != lvl_0_max_len {
+		ss, err := sstable.GenerateFromTree(mem, fmt.Sprintf("%s/%s0_%d", lsm.DataDir, layer_prefix, lsm.getLayer0NameNum()))
+		if err != nil {
+			return err
+		}
+		lsm.Level_0 = append(lsm.Level_0, NewNode(&ss))
+		return nil
+	}
+	err := lsm.compact()
+	if err != nil {
+		return err
+	}
+
+	newLvl0 := []LSMTreeNode{}
+	lsm.Level_0 = newLvl0
+
 	ss, err := sstable.GenerateFromTree(mem, fmt.Sprintf("%s/%s0_%d", lsm.DataDir, layer_prefix, lsm.getLayer0NameNum()))
 	if err != nil {
 		return err
 	}
 
-	if len(lsm.Level_0) != lvl_0_max_len {
-		lsm.Level_0 = append(lsm.Level_0, NewNode(&ss))
-		return nil
-	}
-	err = lsm.compact()
-	if err != nil {
-		return err
-	}
-
-	newLvl0 := []LSMTreeNode{NewNode(&ss)}
-	lsm.Level_0 = newLvl0
+	lsm.Level_0 = append(lsm.Level_0, NewNode(&ss))
 
 	return nil
 }
@@ -128,8 +134,22 @@ func (lsm *LSMTree) compact() error {
 		return err
 	}
 
+	files, err := os.ReadDir(lsm.DataDir)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		if strings.Contains(file.Name(), layer_prefix+"0") {
+			err = os.Remove(lsm.DataDir + "/" + file.Name())
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	if len(lsm.Layers) == 0 {
-		compacted0.FilePath = fmt.Sprintf("%s%s0_1", lsm.DataDir, layer_prefix)
+		compacted0.FilePath = fmt.Sprintf("%s/%s1_1", lsm.DataDir, layer_prefix)
 		err = compacted0.WriteToFile()
 		if err != nil {
 			return err

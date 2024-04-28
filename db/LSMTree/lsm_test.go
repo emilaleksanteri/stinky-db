@@ -3,6 +3,7 @@ package lsmtree
 import (
 	"fmt"
 	"os"
+	"slices"
 	memtable "stinky-db/db/MemTable"
 	"testing"
 )
@@ -80,6 +81,8 @@ func TestCompactLevel0(t *testing.T) {
 		memTables = append(memTables, mem)
 	}
 
+	slices.Reverse(memTables)
+
 	for _, mem := range memTables {
 		err = lsm.InsertMemtable(mem)
 		if err != nil {
@@ -103,5 +106,27 @@ func TestCompactLevel0(t *testing.T) {
 
 	if len(lsm.Layers) != 1 {
 		t.Fatalf("rest of lsm layers should only contain 1 item, got %d\n", len(lsm.Layers))
+	}
+
+	nodeInLayer1 := lsm.Layers[0].Table
+	data, err := nodeInLayer1.GetAllElements()
+	if err != nil {
+		t.Fatalf("could not get data for node in 1: %+v\n", err)
+	}
+
+	expectedValues := []string{
+		"val_3",
+		"val2_3",
+		"val3_3",
+	}
+
+	if len(data) != len(expectedValues) {
+		t.Fatalf("data should be len expected %d, got %d\n", len(expectedValues), len(data))
+	}
+
+	for i, keyval := range data {
+		if keyval.Value != expectedValues[i] {
+			t.Fatalf("wanted %s, got %s\n", expectedValues[i], keyval.Value)
+		}
 	}
 }
