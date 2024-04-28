@@ -9,7 +9,7 @@ import (
 )
 
 func TestWriteTableToFile(t *testing.T) {
-	tree := memtable.NewRBTree()
+	tree := memtable.NewRBTree(0)
 	tree.Insert("5", "e")
 	tree.Insert("6", "f")
 	tree.Insert("7", "g")
@@ -32,7 +32,7 @@ func TestWriteTableToFile(t *testing.T) {
 func TestReadFromDisk(t *testing.T) {
 	defer os.Remove("./myfile")
 
-	tree := memtable.NewRBTree()
+	tree := memtable.NewRBTree(0)
 	tree.Insert("5", "e")
 	tree.Insert("6", "f")
 	tree.Insert("7", "g")
@@ -103,7 +103,7 @@ func TestRestoreTableFromDisk(t *testing.T) {
 func TestGetAllElements(t *testing.T) {
 	defer os.Remove("./myfile")
 
-	tree := memtable.NewRBTree()
+	tree := memtable.NewRBTree(0)
 	tree.Insert("5", "e")
 	tree.Insert("6", "f")
 	tree.Insert("7", "g")

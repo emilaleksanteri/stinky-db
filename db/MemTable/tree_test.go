@@ -1,12 +1,13 @@
 package memtable
 
 import (
+	"errors"
 	"slices"
 	"testing"
 )
 
 func TestInsertLeft(t *testing.T) {
-	tree := NewRBTree()
+	tree := NewRBTree(0)
 	tree.Insert("key2", "value")
 	tree.Insert("key", "value2")
 
@@ -16,7 +17,7 @@ func TestInsertLeft(t *testing.T) {
 }
 
 func TestInsertRight(t *testing.T) {
-	tree := NewRBTree()
+	tree := NewRBTree(0)
 	tree.Insert("key", "value")
 	tree.Insert("key2", "value2")
 
@@ -26,7 +27,7 @@ func TestInsertRight(t *testing.T) {
 }
 
 func TestInsertWithRotation(t *testing.T) {
-	tree := NewRBTree()
+	tree := NewRBTree(0)
 	tree.Insert("key", "value")
 	tree.Insert("key2", "value2")
 	tree.Insert("key3", "value3")
@@ -74,7 +75,7 @@ func TestInsertWithRotation(t *testing.T) {
 }
 
 func TestInsert(t *testing.T) {
-	tree := NewRBTree()
+	tree := NewRBTree(0)
 	tree.Insert("5", "e")
 	tree.Insert("6", "f")
 	tree.Insert("7", "g")
@@ -124,7 +125,7 @@ func TestInsert(t *testing.T) {
 }
 
 func TestGetFromTree(t *testing.T) {
-	tree := NewRBTree()
+	tree := NewRBTree(0)
 	tree.Insert("key", "value")
 	tree.Insert("key2", "value2")
 	tree.Insert("key3", "value")
@@ -136,5 +137,14 @@ func TestGetFromTree(t *testing.T) {
 
 	if value != "value" {
 		t.Errorf("Expected value 'value', got %v", value)
+	}
+}
+
+func TestGetMaxCapacityErrorOnMaxCapacity(t *testing.T) {
+	tree := NewRBTree(10)
+	tree.Insert("key", "value")
+	err := tree.Insert("key2", "value2")
+	if !errors.Is(err, AtMaxCapErr) {
+		t.Errorf("expected max capacity error, got %+v", err)
 	}
 }

@@ -1,9 +1,12 @@
 package lsmtree
 
 import (
+	"fmt"
 	"os"
 	"slices"
+	memtable "stinky-db/db/MemTable"
 	sstable "stinky-db/db/SSTable"
+	"strings"
 )
 
 type LSMTreeNode struct {
@@ -12,16 +15,27 @@ type LSMTreeNode struct {
 }
 
 type LSMTree struct {
-	Level_0 [4]LSMTreeNode
+	Level_0 []LSMTreeNode
 	Layers  []LSMTreeNode
 	DataDir string
 }
 
 var (
-	layer_prefix     = "layer_"
-	compaction_ratio = 10 // each new layer has x10 more sstables
-	compaction_dir   = "./compaction"
+	layer_prefix        = "layer_"
+	compaction_ratio    = 10 // each new layer has x10 more sstables
+	compaction_dir      = "./compaction"
+	test_compaction_dir = "./test-compaction"
+	data_dir            = "./data"
+	test_data_dir       = "./test-data"
+	test_data_gen_dir   = "./test-data-gen"
+	lvl_0_max_len       = 4
 )
+
+func NewNode(ss *sstable.Table) LSMTreeNode {
+	return LSMTreeNode{
+		Table: ss,
+	}
+}
 
 func NewTree(dataDir string) (LSMTree, error) {
 	var lsmtree LSMTree
@@ -38,6 +52,7 @@ func NewTree(dataDir string) (LSMTree, error) {
 	slices.Sort(sortedFileNames)
 
 	tables := []LSMTreeNode{}
+	layer0 := []LSMTreeNode{}
 	for _, fileName := range sortedFileNames {
 		ss, err := sstable.GenerateFromDisk(dataDir + "/" + fileName)
 		if err != nil {
@@ -45,13 +60,40 @@ func NewTree(dataDir string) (LSMTree, error) {
 		}
 
 		node := LSMTreeNode{Table: &ss}
-		tables = append(tables, node)
+
+		if strings.Contains(fileName, layer_prefix+"0") {
+			layer0 = append(layer0, node)
+		} else {
+			tables = append(tables, node)
+		}
 	}
 
 	lsmtree.DataDir = dataDir
 	lsmtree.Layers = tables
+	lsmtree.Level_0 = layer0
 
 	return lsmtree, nil
+}
+
+func (lsm *LSMTree) getLayer0NameNum() int {
+	if len(lsm.Level_0) == 0 {
+		return 1
+	}
+
+	return len(lsm.Level_0)
+}
+
+func (lsm *LSMTree) InsertMemtable(mem *memtable.RBTree) error {
+	if len(lsm.Level_0) != lvl_0_max_len {
+		ss, err := sstable.GenerateFromTree(mem, fmt.Sprintf("%s/%s0_%d", lsm.DataDir, layer_prefix, lsm.getLayer0NameNum()))
+		if err != nil {
+			return err
+		}
+
+		lsm.Level_0 = append(lsm.Level_0, NewNode(&ss))
+	}
+
+	return nil
 }
 
 func (lsm *LSMTree) compactLayer0() (*sstable.Table, error) {

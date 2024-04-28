@@ -1,6 +1,7 @@
 package memtable
 
 import (
+	"errors"
 	"strings"
 	"sync"
 )
@@ -9,6 +10,11 @@ type Color bool
 
 const (
 	red, black Color = true, false
+	MAX_SIZE = 5_000_000
+)
+
+var (
+	AtMaxCapErr = errors.New("at max capacity")
 )
 
 type Node struct {
@@ -31,12 +37,16 @@ type MemTable struct {
 	mu   sync.Mutex
 }
 
-func NewRBTree() *RBTree {
-	return &RBTree{}
+func NewRBTree(maxSize int64) *RBTree {
+	if maxSize == 0 {
+		return &RBTree{MaxSize: MAX_SIZE}
+	} else {
+		return &RBTree{MaxSize: maxSize}
+	}
 }
 
 func NewWithRoot(root *Node) *RBTree {
-	return &RBTree{Root: root, Size: 1}
+	return &RBTree{Root: root, Size: int64(len(root.Key) + len(root.Value))}
 }
 
 const (
@@ -57,11 +67,15 @@ func (t *RBTree) AtMaxSize() bool {
 	return t.Size == t.MaxSize
 }
 
-func (t *RBTree) Insert(key, value string) {
+func (t *RBTree) Insert(key, value string) error {
 	if t.Root == nil {
 		t.Root = &Node{Key: key, Value: value, Color: black}
 		t.Size += int64(len(key) + len(value))
-		return
+		return nil
+	}
+
+	if int64(len(key) + len(value)) + t.Size >= t.MaxSize {
+		return AtMaxCapErr
 	}
 
 	node := t.Root
@@ -99,6 +113,7 @@ func (t *RBTree) Insert(key, value string) {
 	}
 
 	t.checkRotate(inserted)
+	return nil
 }
 
 type Found bool
@@ -270,13 +285,13 @@ func (m *MemTable) SwapTree() *RBTree {
 	defer m.mu.Unlock()
 
 	currTree := m.Tree
-	m.Tree = NewRBTree()
+	m.Tree = NewRBTree(currTree.MaxSize)
 
 	return currTree
 }
 
-func MemTableFromCache(cache map[string]string) *MemTable {
-	tree := NewRBTree()
+func MemTableFromCache(cache map[string]string, maxSize int64) *MemTable {
+	tree := NewRBTree(maxSize)
 	for key, value := range cache {
 		tree.Insert(key, value)
 	}
