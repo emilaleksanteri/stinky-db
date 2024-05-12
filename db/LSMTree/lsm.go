@@ -16,7 +16,7 @@ type LSMTreeNode struct {
 
 type LSMTree struct {
 	Level_0       []LSMTreeNode
-	Layers        []LSMTreeNode
+	Layers        map[string][]LSMTreeNode
 	DataDir       string
 	CompactionDir string
 }
@@ -52,7 +52,7 @@ func NewTree(dataDir, compactionDir string) (LSMTree, error) {
 	}
 	slices.Sort(sortedFileNames)
 
-	tables := []LSMTreeNode{}
+	tables := map[string][]LSMTreeNode{}
 	layer0 := []LSMTreeNode{}
 	for _, fileName := range sortedFileNames {
 		ss, err := sstable.GenerateFromDisk(dataDir + "/" + fileName)
@@ -65,7 +65,11 @@ func NewTree(dataDir, compactionDir string) (LSMTree, error) {
 		if strings.Contains(fileName, layer_prefix+"0") {
 			layer0 = append(layer0, node)
 		} else {
-			tables = append(tables, node)
+			layerPrefix := strings.
+				Split(strings.
+					Split(fileName, layer_prefix)[1], "_")[0]
+
+			tables[layerPrefix] = append(tables[layerPrefix], node)
 		}
 	}
 
@@ -148,13 +152,13 @@ func (lsm *LSMTree) compact() error {
 		}
 	}
 
-	if len(lsm.Layers) == 0 {
+	if len(lsm.Layers["1"]) == 0 {
 		compacted0.FilePath = fmt.Sprintf("%s/%s1_1", lsm.DataDir, layer_prefix)
 		err = compacted0.WriteToFile()
 		if err != nil {
 			return err
 		}
-		lsm.Layers = append(lsm.Layers, NewNode(compacted0))
+		lsm.Layers["1"] = append(lsm.Layers["1"], NewNode(compacted0))
 		return nil
 	}
 

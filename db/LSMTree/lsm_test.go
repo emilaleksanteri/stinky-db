@@ -108,7 +108,7 @@ func TestCompactLevel0(t *testing.T) {
 		t.Fatalf("rest of lsm layers should only contain 1 item, got %d\n", len(lsm.Layers))
 	}
 
-	nodeInLayer1 := lsm.Layers[0].Table
+	nodeInLayer1 := lsm.Layers["1"][0].Table
 	data, err := nodeInLayer1.GetAllElements()
 	if err != nil {
 		t.Fatalf("could not get data for node in 1: %+v\n", err)
